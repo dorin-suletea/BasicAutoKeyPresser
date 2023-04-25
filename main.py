@@ -1,28 +1,10 @@
-from pynput.keyboard import Key
 from pynput.keyboard import Controller as KeyController
-from pynput import keyboard, mouse
-from pynput.mouse import Button
-from pynput.mouse import Controller as MouseController
-import sys
-import os
+from pynput import keyboard
 import time
 
-asciiart = """
+keyCount = 0
+keyAndInterval = []
 
-                _        _  __          
-     /\        | |      | |/ /          
-    /  \  _   _| |_ ___ | ' / ___ _   _ 
-   / /\ \| | | | __/ _ \|  < / _ \ | | |
-  / ____ \ |_| | || (_) | . \  __/ |_| |
- /_/    \_\__,_|\__\___/|_|\_\___|\__, |
-                                   __/ |
-                                  |___/ 
-                            
-Fork of : git@github.com:kaleidosc/AutoKey.git                             
-"""
-
-key = '1'
-intervalMillis = '1000'
 paused = False
 running = True
 controller = KeyController()
@@ -37,12 +19,28 @@ def bail():
 
 
 def configure():
-    global key
-    global intervalMillis
-    key = input("Key to press :")
-    intervalMillis = float(input("Interval millis :"))
-    print('Pressing "{}" every {} millis.'.format(key, intervalMillis))
+    global keyCount
+    keyCount = int(input("How many distinct keys:"))
+    for x in range(keyCount):
+        key = input("Key to press:")
+        if len(key) > 1:
+            print("Error {} is not a key ".format(key))
+            raise SystemExit
+        interval = float(input("Interval millis :"))
+        keyAndInterval.append((key, interval))
+    keyAndInterval.sort(key=lambda a: a[1])
+
+    log = "Pressing [key,interval]-> "
+    for ki in keyAndInterval:
+        print(ki)
+        log += "[K={},I={}], ".format(ki[0], ki[1])
+    print(log)
     print("F3 to pause/resume")
+
+
+def press(key):
+    controller.press(key)
+    controller.release(key)
 
 
 def run_loop():
@@ -59,12 +57,21 @@ def run_loop():
         on_release=on_pause_release)
     listener.start()
 
+    # TODO: optimally should be highest common divisor
+    wait_between_loops = 10
+    keys = []
+    for k in keyAndInterval:
+        keys.append({'key': k[0], 'delay': k[1], 'pressedAt': 0})
+
     while running:
         if not paused:
-            controller.press(key)
-            controller.release(key)
+            now = time.time()*1000
+            for k in keys:
+                if k['pressedAt'] + k['delay'] <= now:
+                    press(k['key'])
+                    k['pressedAt'] = now
         try:
-            time.sleep(intervalMillis/1000)
+            time.sleep(wait_between_loops / 1000)
         except KeyboardInterrupt:
             bail()
 
